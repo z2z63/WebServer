@@ -13,25 +13,24 @@
 #include <fstream>
 #include "HttpResponse.h"
 #include "HttpRequest.h"
+#include "ThreadPool.h"
 
 
 class WebServer {
 private:
     unsigned short port;
-    unsigned short threadNum;
     int socketFd;
     std::filesystem::path templatesPath;
     std::map<std::string, std::function<void(HttpRequest &, HttpResponse &)>> routeMap;
+    ThreadPool<std::function<void()>> pool;
 public:
-    WebServer();
+    explicit WebServer(unsigned short threadNum = 8);
 
     ~WebServer();
 
     WebServer &bind(unsigned short port);
 
-    WebServer &setThreadNum(unsigned short _threadNum);
-
-    WebServer &run();
+    void run();
 
     WebServer &route(const std::string &path, void(*callback)(HttpRequest &, HttpResponse &));
 

@@ -1,3 +1,9 @@
 body{
     background-color: azure;
 }
+#container{
+    width: 800px;
+    display: flex;
+    margin: auto;
+    flex-direction: column;
+}

@@ -2,9 +2,8 @@
 #include "WebServer.h"
 
 
-WebServer::WebServer() {
+WebServer::WebServer(unsigned short threadNum) : pool(threadNum) {
     port = -1;
-    threadNum = -1;
     templatesPath = "";
     socketFd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFd < 0) {
@@ -35,29 +34,22 @@ WebServer &WebServer::bind(unsigned short _port) {
     return *this;
 }
 
-WebServer &WebServer::setThreadNum(unsigned short _threadNum) {
-    threadNum = _threadNum;
-    return *this;
-}
 
-WebServer &WebServer::run() {
+void WebServer::run() {
     if (listen(socketFd, 16)) {
         throw std::runtime_error("listen error");
     }
     std::cout << "listening at http://127.0.0.1:" << port << "/" << std::endl;
     struct sockaddr_in clientAddr{};
     socklen_t clientAddrLen = sizeof(sockaddr_in);
-    int clientSocket = -1;
-    int res = -1;
+    int clientSocket;
     while (true) {
         clientSocket = accept(socketFd, (struct sockaddr *) &clientAddr, &clientAddrLen);
         if (clientSocket < 0) {
             throw std::runtime_error("client socket error");
         }
-        wrapper(clientSocket);
-        close(clientSocket);
-    };
-    return *this;
+        pool.submitTask([this, clientSocket] { wrapper(clientSocket); });
+    }
 }
 
 WebServer &WebServer::route(const std::string &path, void(*callback)(HttpRequest &, HttpResponse &)) {
@@ -93,6 +85,8 @@ void WebServer::wrapper(int clientSocket) {
         sentSize += sent;
     }
     delete[] buffer;
+    close(clientSocket);
+    std::cout << "close socket\t" << clientSocket << "\tat path\t" << request.path << std::endl;
 }
 
 WebServer &WebServer::setFilePath(const std::filesystem::path &path) {
@@ -125,7 +119,7 @@ WebServer &WebServer::setFilePath(const std::filesystem::path &path) {
 
 void WebServer::fileFetcher(HttpRequest &request, HttpResponse &response) {
     std::string pathWithoutSlash = request.path.substr(1, request.path.length() - 1);
-    if(pathWithoutSlash.empty()){
+    if (pathWithoutSlash.empty()) {
         pathWithoutSlash = "index.html";
     }
     auto path = templatesPath / pathWithoutSlash;
@@ -137,18 +131,18 @@ void WebServer::fileFetcher(HttpRequest &request, HttpResponse &response) {
     file.read(reinterpret_cast<char *>(body.data()), fileSize);
     file.close();
     response.setBody(body);
-    if(pathWithoutSlash.empty()){
+    if (pathWithoutSlash.empty()) {
         response.field["Content-Type"] = "text/html; charset=utf-8";
         return;
     }
     std::string extName = pathWithoutSlash.substr(pathWithoutSlash.rfind('.'), pathWithoutSlash.length());
-    if(extName == "jpg"){
+    if (extName == "jpg") {
         response.field["Content-Type"] = "image/jpeg";
-    }else if(extName == "png"){
+    } else if (extName == "png") {
         response.field["Content-Type"] = "image/png";
-    }else if(extName == "css"){
+    } else if (extName == "css") {
         response.field["Content-Type"] = "text/css";
-    }else if(extName == "js"){
+    } else if (extName == "js") {
         response.field["Content-Type"] = "text/javascript; charset=utf-8";
     }
 }
