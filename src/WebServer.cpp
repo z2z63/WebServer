@@ -3,7 +3,7 @@
 
 WebServer::WebServer(unsigned short threadNum) : pool(threadNum) {
     port = -1;
-    templatesPath = "";
+    staticFilePath = "";
     socketFd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFd < 0) {
         throw std::runtime_error("socket file descriptor error");
@@ -51,30 +51,32 @@ void WebServer::run() {
     }
 }
 
-WebServer &WebServer::route(const std::string &path, void(*callback)(HttpRequest &, HttpResponse &)) {
-    std::pair<std::string, void (*)(HttpRequest &, HttpResponse &)> p = {path, callback};
+WebServer &WebServer::route(const std::string &path, HttpResponse (*callback)(HttpRequest &)) {
+    std::pair<std::string, HttpResponse (*)(HttpRequest &)> p = {path, callback};
     routeMap.insert(p);
     return *this;
 }
 
 void WebServer::wrapper(int clientSocket) {
     HttpRequest request(clientSocket);
-    HttpResponse response;
+    byte *buffer;
+    size_t totalSize;
     try {
         auto it = routeMap.find(request.path);
         if (it == routeMap.end()) {
             throw std::runtime_error("path not in routeMap");
         }
         auto callback = it->second;
-        callback(request, response);
+        HttpResponse response = callback(request);
+        totalSize = response.build(buffer);
     } catch (std::exception &e) {
+        HttpResponse response;
         response.code = 404;
         std::string errorPage = "<h1>404 Not Found<h1>";
         response.body = std::vector<byte>(errorPage.begin(), errorPage.end());
         std::cout << e.what() << std::endl;
+        totalSize = response.build(buffer);
     }
-    byte *buffer;
-    size_t totalSize = response.build(buffer);
     size_t sentSize = 0;
     while (sentSize < totalSize) {
         size_t sent = write(clientSocket, buffer + sentSize, sizeof(byte) * (totalSize - sentSize));
@@ -88,9 +90,9 @@ void WebServer::wrapper(int clientSocket) {
     std::cout << "close socket\t" << clientSocket << "\tat path\t" << request.path << std::endl;
 }
 
-WebServer &WebServer::setFilePath(const std::filesystem::path &path) {
-    templatesPath = path;
-    std::queue<std::filesystem::path> que{{templatesPath}};
+WebServer &WebServer::setStaticFilePath(const std::filesystem::path &path) {
+    staticFilePath = path;
+    std::queue<std::filesystem::path> que{{staticFilePath}};
     while (not que.empty()) {
         auto file = que.front();
         que.pop();
@@ -100,14 +102,14 @@ WebServer &WebServer::setFilePath(const std::filesystem::path &path) {
             }
             continue;
         }
-        std::string urlPath = std::filesystem::relative(file, templatesPath);
+        std::string urlPath = std::filesystem::relative(file, staticFilePath);
         if (urlPath == "index.html") {
-            routeMap["/"] = [this](HttpRequest &request, HttpResponse &response) {
-                fileFetcher(request, response);
+            routeMap["/"] = [this](HttpRequest &request) {
+                return fileFetcher(request);
             };
         } else {
-            routeMap["/" + urlPath] = [this](HttpRequest &request, HttpResponse &response) {
-                fileFetcher(request, response);
+            routeMap["/" + urlPath] = [this](HttpRequest &request) {
+                return fileFetcher(request);
             };
         }
 
@@ -116,12 +118,13 @@ WebServer &WebServer::setFilePath(const std::filesystem::path &path) {
     return *this;
 }
 
-void WebServer::fileFetcher(HttpRequest &request, HttpResponse &response) {
+HttpResponse WebServer::fileFetcher(HttpRequest &request) {
+    HttpResponse response;
     std::string pathWithoutSlash = request.path.substr(1, request.path.length() - 1);
     if (pathWithoutSlash.empty()) {
         pathWithoutSlash = "index.html";
     }
-    auto path = templatesPath / pathWithoutSlash;
+    auto path = staticFilePath / pathWithoutSlash;
     std::ifstream file(path);
     file.seekg(0, std::ios::end);
     int fileSize = (int) file.tellg();
@@ -132,7 +135,7 @@ void WebServer::fileFetcher(HttpRequest &request, HttpResponse &response) {
     response.setBody(body);
     if (pathWithoutSlash.empty()) {
         response.field["Content-Type"] = "text/html; charset=utf-8";
-        return;
+        return response;
     }
     std::string extName = pathWithoutSlash.substr(pathWithoutSlash.rfind('.'), pathWithoutSlash.length());
     if (extName == "jpg") {
@@ -144,6 +147,12 @@ void WebServer::fileFetcher(HttpRequest &request, HttpResponse &response) {
     } else if (extName == "js") {
         response.field["Content-Type"] = "text/javascript; charset=utf-8";
     }
+    return response;
+}
+
+WebServer &WebServer::setTemplateFilePath(const std::filesystem::path &path) {
+    templateFilePath = path;
+    return *this;
 }
 
 

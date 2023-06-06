@@ -12,6 +12,7 @@
 #include <queue>
 #include <fstream>
 #include <yaml-cpp/yaml.h>
+#include <mstch/mstch.hpp>
 #include "HttpResponse.h"
 #include "HttpRequest.h"
 #include "ThreadPool.h"
@@ -21,8 +22,9 @@ class WebServer {
 private:
     unsigned short port;
     int socketFd;
-    std::filesystem::path templatesPath;
-    std::map<std::string, std::function<void(HttpRequest &, HttpResponse &)>> routeMap;
+    std::filesystem::path staticFilePath;
+    std::filesystem::path templateFilePath;
+    std::map<std::string, std::function<HttpResponse(HttpRequest &)>> routeMap;
     ThreadPool<std::function<void()>> pool;
 public:
     explicit WebServer(unsigned short threadNum = 8);
@@ -33,14 +35,16 @@ public:
 
     void run();
 
-    WebServer &route(const std::string &path, void(*callback)(HttpRequest &, HttpResponse &));
+    WebServer &route(const std::string &path, HttpResponse(*callback)(HttpRequest &));
 
-    WebServer &setFilePath(const std::filesystem::path &path);
+    WebServer &setStaticFilePath(const std::filesystem::path &path);
+
+    WebServer &setTemplateFilePath(const std::filesystem::path &path);
 
 private:
     void wrapper(int clientSocket);
 
-    void fileFetcher(HttpRequest &request, HttpResponse &response);
+    HttpResponse fileFetcher(HttpRequest &request);
 };
 
 

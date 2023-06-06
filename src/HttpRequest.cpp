@@ -2,9 +2,6 @@
 
 HttpRequest::HttpRequest(int clientSocket) {
     char buffer[1024];
-//    std::vector<char> lines;
-//    auto it = lines.begin();
-//    it++
     std::stringstream httpText;
     ssize_t size = read(clientSocket, buffer, sizeof(buffer) - 1);
     if (size == -1) {
