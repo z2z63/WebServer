@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <queue>
 #include <fstream>
+#include <yaml-cpp/yaml.h>
 #include "HttpResponse.h"
 #include "HttpRequest.h"
 #include "ThreadPool.h"
