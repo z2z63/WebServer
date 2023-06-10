@@ -126,11 +126,7 @@ HttpResponse WebServer::fileFetcher(HttpRequest &request) {
     }
     auto path = staticFilePath / pathWithoutSlash;
     std::ifstream file(path);
-    file.seekg(0, std::ios::end);
-    int fileSize = (int) file.tellg();
-    file.seekg(0, std::ios::beg);
-    std::vector<byte> body(fileSize);
-    file.read(reinterpret_cast<char *>(body.data()), fileSize);
+    std::vector<byte> body(std::istreambuf_iterator<char>(file), {});
     file.close();
     response.setBody(body);
     if (pathWithoutSlash.empty()) {

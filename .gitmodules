@@ -1,0 +1,3 @@
+[submodule "external/mstch"]
+	path = external/mstch
+	url = git@github.com:no1msd/mstch.git

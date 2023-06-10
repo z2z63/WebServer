@@ -9,7 +9,7 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
-#include <mstch/mstch.hpp>
+#include "mstch/mstch.hpp"
 
 typedef unsigned char byte;
 

@@ -1,4 +1,3 @@
-#include <iostream>
 #include "HttpResponse.h"
 
 std::filesystem::path HttpResponse::templateFilePath = "templates";
@@ -59,6 +58,7 @@ HttpResponse &HttpResponse::render(const std::filesystem::path &path, const mstc
 
 HttpResponse::HttpResponse(std::filesystem::path &templateFilePath_) {
     templateFilePath = templateFilePath_;
+    code = 200;
 }
 
 
